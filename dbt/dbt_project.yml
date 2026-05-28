@@ -1,0 +1,19 @@
+name: 'financial_analytics'
+version: '1.0.0'
+config-version: 2
+
+profile: 'financial_analytics'
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+
+models:
+  financial_analytics:
+    staging:
+      +materialized: view # Staging layer menjadi view sesuai standard Week-6
+    marts:
+      +materialized: table # Marts layer default menjadi table
+
+vars:
+  execution_date: "2026-04-01" # Default date untuk testing lokal seperti di Week-13
