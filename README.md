@@ -39,9 +39,3 @@ Kita perlu membuat wadah internal agar Metabase dan Airflow tidak mengalami *cra
 Setelah sistem di-*restart*, tunggu sekitar 20-30 detik untuk proses *booting* Java dan Python, lalu buka di *browser* kalian:
 - **Apache Airflow (Orkestrasi):** `http://localhost:8080` (Gunakan otentikasi Admin yang sudah diatur).
 - **Metabase (Visualisasi):** `http://localhost:3001` (Jika muncul tulisan error, tunggu sebentar dan *refresh* karena Metabase butuh waktu untuk membangun tabel awalnya).
-
----
-**Aturan Kerja Tim:**
-* Infrastruktur utama di *branch* `main` sudah stabil. 
-* Saat kalian ingin mulai menulis *script* ingesti (Python) atau transformasi (SQL dbt), **WAJIB** membuat *branch* baru terlebih dahulu (contoh: `feature/ingestion` atau `feature/dbt-models`).
-* Jangan melakukan manipulasi pada file Docker kecuali didiskusikan bersama!
