@@ -13,6 +13,10 @@ x-airflow-common: &airflow-common
     # Konfigurasi Path dbt & GCP Service Account
     DBT_PROFILES_DIR: /opt/airflow/dbt
     GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/credentials/service-account.json
+    
+    # Auto-create akun Admin Airflow
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: 'airflow:admin'
+    # AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: 'true'
   volumes:
     - ./container/dags:/opt/airflow/dags
     - ./container/logs:/opt/airflow/logs
@@ -20,7 +24,7 @@ x-airflow-common: &airflow-common
     - ./dbt:/opt/airflow/dbt
     - ./credentials:/opt/airflow/credentials
     - ./ingestion:/opt/airflow/ingestion
-  dependencies:
+  depends_on:
     postgres:
       condition: service_healthy
 
@@ -39,11 +43,13 @@ services:
       retries: 5
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
-  # 2. Airflow Webserver (UI)
+  # 2. Airflow Webserver (UI) - Sudah diganti ke api-server
   airflow-webserver:
     <<: *airflow-common
-    command: webserver
+    command: api-server
     ports:
       - "8080:8080"
     restart: always
@@ -58,7 +64,7 @@ services:
   metabase:
     image: metabase/metabase:latest
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
       MB_DB_TYPE: postgres
       MB_DB_DBNAME: metabase
@@ -67,3 +73,6 @@ services:
       MB_DB_PASS: airflow
       MB_DB_HOST: postgres
     restart: always
+  
+volumes:
+  postgres_data:
