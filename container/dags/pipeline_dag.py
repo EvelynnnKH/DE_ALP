@@ -17,8 +17,8 @@ INGESTION_DIR   = "/opt/airflow/ingestion"
 with DAG(
     dag_id="master_financial_pipeline",
     description="Pipeline End-to-End: Ingesti Data Saham harian dan Transformasi dbt",
-    start_date=datetime(2026, 4, 1),           # Menyesuaikan rentang waktu dataset harian
-    end_date=datetime(2026, 4, 30),
+    start_date=datetime(2020, 1, 3),           # Menyesuaikan rentang waktu dataset harian
+    end_date=datetime(2026, 2, 11),
     schedule="@daily",                         # Eksekusi batch harian (Batch Processing)
     catchup=False,                             # Mencegah penumpukan eksekusi otomatis saat nyala
     max_active_runs=1,                         # Eksekusi berurutan agar BigQuery aman dari conflict

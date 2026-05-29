@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+/venv
+credentials/service-account.json
+.env
+container/logs/
