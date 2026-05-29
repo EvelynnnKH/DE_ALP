@@ -37,7 +37,6 @@ def load_raw_data(execution_date):
     # Filter data berdasarkan execution_date (format YYYY-MM-DD)
     # Kolom Date di CSV berformat '2020-01-03 00:00:00-05:00'
     for chunk in pd.read_csv(csv_path, chunksize=10000):
-        chunk['Date'] = pd.to_datetime(chunk['Date'], utc=True)
         filtered_chunk = chunk[chunk['Date'].astype(str).str.startswith(execution_date)].copy()
         if not filtered_chunk.empty:
             filtered_chunk['Date'] = pd.to_datetime(filtered_chunk['Date'], utc=True)
@@ -55,8 +54,19 @@ def load_raw_data(execution_date):
 
     # 5. Ingesti ke BigQuery secara Idempotent
     # WRITE_TRUNCATE akan menghapus isi tabel lama dan menggantinya dengan yang baru
+    print(f"Membersihkan data lama di BigQuery untuk tanggal {execution_date} (Idempotency Check)...")
+    try:
+        # Menggunakan DATE(date) karena di BigQuery tipe datanya adalah Timestamp dengan zona waktu
+        delete_query = f"DELETE FROM `{full_table_id}` WHERE DATE(date) = '{execution_date}'"
+        delete_job = client.query(delete_query)
+        delete_job.result()  # Menunggu proses penghapusan selesai
+        print(f"Pembersihan selesai. Mengunggah data baru...")
+    except Exception as e:
+        print(f"Catatan (Bukan Error): Gagal/Tidak perlu menghapus data lama: {e}")
+
+    # Langkah B: Konfigurasi Load Job menggunakan WRITE_APPEND
     job_config = bigquery.LoadJobConfig(
-        write_disposition="WRITE_TRUNCATE",
+        write_disposition="WRITE_APPEND",  # <--- SEKARANG PAKAI APPEND AGAR DATA BERTAHAP NYETAK
         source_format=bigquery.SourceFormat.PARQUET if hasattr(pd, 'to_parquet') else bigquery.SourceFormat.CSV,
         autodetect=True,
     )
