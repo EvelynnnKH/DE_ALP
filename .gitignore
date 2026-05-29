@@ -1,6 +1,18 @@
 __pycache__/
 *.pyc
 /venv
-credentials/service-account.json
+
+# Environment & Secrets
 .env
+credentials/service-account.json
+
+# Logs
+logs/
 container/logs/
+dbt/logs/
+
+# dbt generated artifacts
+dbt/target/
+
+# VSCode
+.vscode/
