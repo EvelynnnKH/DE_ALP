@@ -18,17 +18,17 @@ with DAG(
     dag_id="master_financial_pipeline",
     description="Pipeline End-to-End: Ingesti Data Saham harian dan Transformasi dbt",
     start_date=datetime(2020, 1, 3),           # Menyesuaikan rentang waktu dataset harian
-    end_date=datetime(2026, 2, 11),
+    # end_date=datetime(2026, 2, 11),
     schedule="@daily",                         # Eksekusi batch harian (Batch Processing)
-    catchup=False,                             # Mencegah penumpukan eksekusi otomatis saat nyala
+    catchup=False,                             # Menscegah penumpukan eksekusi otomatis saat nyala
     max_active_runs=1,                         # Eksekusi berurutan agar BigQuery aman dari conflict
     default_args=default_args,
     tags=["final_project", "bigquery", "dbt", "incremental"],
 ) as dag:
 
     # TASK 1: Eksekusi skrip Python untuk Ingesti ke Bronze Layer (Akan diisi oleh Spesialis Ingesti)
-    upload_transactions = BashOperator(
-        task_id="upload_transactions",
+    upload_stock_prices = BashOperator(
+        task_id="upload_stock_prices",
         bash_command=f"python {INGESTION_DIR}/load_raw.py --date {{{{ ds }}}}"
     )
 
@@ -41,13 +41,14 @@ with DAG(
     # TASK 3: Membangun Ulang Tabel Dimensi (Drop and Recreate Table harian)
     dbt_run_dims = BashOperator(
         task_id="dbt_run_dims",
-        bash_command=f"dbt run --project-dir {DBT_PROJECT_DIR} --select dim_customer dim_product dim_date"
+        bash_command=f"dbt run --project-dir {DBT_PROJECT_DIR} --select dim_stock dim_sector dim_industry dim_date"
     )
 
     # TASK 4: Transformasi Inkremental Gold Layer (Hanya memproses data tanggal terkait menggunakan Merge)
+    # INI MASIH ERROR YA YANG INCREMENTAL (MASIH DLM BTK TABLE!!!!)
     dbt_run_incremental = BashOperator(
         task_id="dbt_run_incremental",
-        bash_command=f"dbt run --project-dir {DBT_PROJECT_DIR} --select fact_sales fct_daily_summary --vars '{{\"execution_date\": \"{{{{ ds }}}}\" }}'"
+        bash_command=f"dbt run --project-dir {DBT_PROJECT_DIR} --select fact_stock_prices"
     )
 
     # TASK 5: Data Quality Testing (Gerbang validasi Unique, Not Null, dan Relasi)
@@ -57,4 +58,4 @@ with DAG(
     )
 
     # 4. Menyusun urutan eksekusi pipeline (Dependency Chain)
-    upload_transactions >> dbt_run_staging >> dbt_run_dims >> dbt_run_incremental >> dbt_test
+    upload_stock_prices >> dbt_run_staging >> dbt_run_dims >> dbt_run_incremental >> dbt_test
