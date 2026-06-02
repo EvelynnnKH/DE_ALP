@@ -1,0 +1,72 @@
+version: 2
+
+models:
+
+  - name: dim_stock
+    columns:
+      - name: stock_key
+        tests:
+          - not_null
+          - unique
+
+      - name: ticker
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_sector
+    columns:
+      - name: sector_key
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_industry
+    columns:
+      - name: industry_key
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_date
+    columns:
+      - name: date_key
+        tests:
+          - not_null
+          - unique
+
+      - name: full_date
+        tests:
+          - not_null
+          - unique
+
+  - name: fact_stock_prices
+    columns:
+      - name: fact_id
+        tests:
+          - not_null
+          - unique
+
+      - name: stock_key
+        tests:
+          - not_null
+
+      - name: sector_key
+        tests:
+          - not_null
+
+      - name: industry_key
+        tests:
+          - not_null
+
+      - name: date_key
+        tests:
+          - not_null
+
+      - name: close_price
+        tests:
+          - not_null
+
+      - name: volume
+        tests:
+          - not_null

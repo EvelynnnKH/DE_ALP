@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: raw
+    project: de-final-project-2026
+    dataset: raw
+
+    tables:
+      - name: raw_stock_prices
