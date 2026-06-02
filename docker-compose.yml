@@ -7,16 +7,23 @@ x-airflow-common: &airflow-common
   environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-    AIRFLOW__CORE__FERNET_KEY: 'FB1Kyv7R4_839Sp_S_X639SL_X4=G639SL_X4=G639SL_X4='
+    AIRFLOW__CORE__FERNET_KEY: '${AIRFLOW_FERNET_KEY}'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
     AIRFLOW__CORE__LOGGING_LEVEL: INFO
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
     # Konfigurasi Path dbt & GCP Service Account
     DBT_PROFILES_DIR: /opt/airflow/dbt
     GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/credentials/service-account.json
     
     # Auto-create akun Admin Airflow
     AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: 'airflow:admin'
-    # AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: 'true'
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: 'true'
+
+    # 🔑 KUNCI SAKTI: Menyamakan token keamanan agar tidak 403 Forbidden lagi
+    AIRFLOW__API_AUTH__JWT_SECRET: 'rahasia-kita-berdua-biar-ga-error-lagi-123'
+    AIRFLOW__API__AUTH_JWT_SECRET: 'rahasia-kita-berdua-biar-ga-error-lagi-123'
+    AIRFLOW__WEBSERVER__SECRET_KEY: 'rahasia-kita-berdua-biar-ga-error-lagi-123'
+    
   volumes:
     - ./container/dags:/opt/airflow/dags
     - ./container/logs:/opt/airflow/logs
@@ -46,8 +53,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  # 2. Airflow Webserver (UI) - Sudah diganti ke api-server
-  airflow-webserver:
+  # 2. Airflow Webserver / API Server (UI)
+  airflow-apiserver:
     <<: *airflow-common
     command: api-server
     ports:
@@ -60,7 +67,13 @@ services:
     command: scheduler
     restart: always
 
-  # 4. Metabase (BI Tool)
+  # 4. Airflow DAG Processor (Eksekutor DAG)
+  airflow-dag-processor:
+    <<: *airflow-common
+    command: dag-processor
+    restart: always
+
+  # 5. Metabase (BI Tool)
   metabase:
     image: metabase/metabase:latest
     ports:

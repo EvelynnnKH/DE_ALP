@@ -13,4 +13,7 @@ USER airflow
 # Swap dbt-duckdb ke dbt-bigquery sesuai standard migrasi cloud
 RUN pip install --no-cache-dir \
     dbt-core==1.11.7 \
-    dbt-bigquery==1.9.0
+    dbt-bigquery==1.9.0 \
+    pandas \
+    google-cloud-bigquery \
+    pyarrow
