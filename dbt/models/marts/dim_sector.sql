@@ -1,23 +1,13 @@
 with sectors as (
-
     select distinct sector
     from {{ ref('stg_stock_prices') }}
-
 ),
 
 final as (
-
     select
-
-        row_number() over (
-            order by sector
-        ) as sector_key,
-
+        to_hex(md5(sector)) as sector_key,
         sector
-
     from sectors
-
 )
 
-select *
-from final
+select * from final
