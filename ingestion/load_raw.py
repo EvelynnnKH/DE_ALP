@@ -4,86 +4,79 @@ import os
 from google.cloud import bigquery
 from google.oauth2 import service_account
 
+# MAIN INGESTION FUNCTION (DAILY INCREMENTAL LOAD)
 def load_raw_data(execution_date):
-    # 1. Konfigurasi Path (Menyesuaikan dengan folder DE_ALP)
-    current_dir = os.path.dirname(os.path.abspath(__file__)) # /opt/airflow/ingestion
-    project_root = os.path.abspath(os.path.join(current_dir, '..')) # /opt/airflow
+    """
+    Fungsi operasional harian untuk menarik HANYA data baru 
+    sesuai tanggal eksekusi Airflow, lalu menyisipkannya (APPEND) ke BigQuery.
+    """
     
-    # Path ke file CSV dan Credentials
-    # Pastikan file stock_prices.csv ada di folder utama DE_ALP
+    current_dir = os.path.dirname(os.path.abspath(__file__)) 
+    project_root = os.path.abspath(os.path.join(current_dir, '..')) 
+    
     csv_path = os.path.join(current_dir, 'stock_prices.csv')
     key_path = os.path.join(project_root, 'credentials', 'service-account.json')
 
-    # 2. Konfigurasi BigQuery (Ubah PROJECT_ID sesuai milikmu)
     PROJECT_ID = 'de-final-project-2026' 
     DATASET_ID = 'raw'
     TABLE_ID = 'raw_stock_prices'
-    # Jika ingin idempotent per tanggal, gunakan sharded table (misal: raw_stock_prices_20260529)
-    # atau biarkan satu tabel jika menggunakan WRITE_TRUNCATE untuk landing zone.
     full_table_id = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}"
 
-    # 3. Inisialisasi BigQuery Client
     if not os.path.exists(key_path):
-        print(f"Error: File service-account.json tidak ditemukan di {key_path}")
+        print(f"Error: Kredensial tidak ditemukan.")
         return
 
     credentials = service_account.Credentials.from_service_account_file(key_path)
     client = bigquery.Client(credentials=credentials, project=PROJECT_ID)
 
-    # 4. Membaca dan Memfilter Data
-    print(f"Membaca data dari {csv_path}...")
-    chunks_list = []
+    # A. Ekstraksi & Filter Data Harian (Logika Evelyn)
+    print(f"Mencari data khusus tanggal {execution_date} dari {csv_path}...")
     
-    # Filter data berdasarkan execution_date (format YYYY-MM-DD)
-    # Kolom Date di CSV berformat '2020-01-03 00:00:00-05:00'
+    chunks_list = []
     for chunk in pd.read_csv(csv_path, chunksize=10000):
+        # FILTER: Hanya ambil baris yang tanggalnya cocok dengan Airflow hari ini
         filtered_chunk = chunk[chunk['Date'].astype(str).str.startswith(execution_date)].copy()
+        
         if not filtered_chunk.empty:
             filtered_chunk['Date'] = pd.to_datetime(filtered_chunk['Date'], utc=True)
             chunks_list.append(filtered_chunk)
 
     if not chunks_list:
-        print(f"Peringatan: Tidak ada data untuk tanggal {execution_date}")
+        print(f"Aman: Tidak ada data saham baru untuk tanggal {execution_date} (Mungkin hari libur bursa).")
         return
 
     filtered_df = pd.concat(chunks_list, ignore_index=True)
 
-    if filtered_df.empty:
-        print(f"Peringatan: Tidak ada data untuk tanggal {execution_date}")
-        return
-
-    # 5. Ingesti ke BigQuery secara Idempotent
-    # WRITE_TRUNCATE akan menghapus isi tabel lama dan menggantinya dengan yang baru
-    print(f"Membersihkan data lama di BigQuery untuk tanggal {execution_date} (Idempotency Check)...")
+    # B. Idempotency Check (Pembersihan Hari H)
+    # Jika kita melakukan "Rerun" (Clear Task) di Airflow untuk hari ini,
+    # hapus dulu data hari ini yang sudah terlanjur masuk agar tidak double.
     try:
-        # Menggunakan DATE(date) karena di BigQuery tipe datanya adalah Timestamp dengan zona waktu
         delete_query = f"DELETE FROM `{full_table_id}` WHERE DATE(date) = '{execution_date}'"
-        delete_job = client.query(delete_query)
-        delete_job.result()  # Menunggu proses penghapusan selesai
-        print(f"Pembersihan selesai. Mengunggah data baru...")
+        client.query(delete_query).result()
     except Exception as e:
-        print(f"Catatan (Bukan Error): Gagal/Tidak perlu menghapus data lama: {e}")
+        pass # Abaikan jika gagal (misal tabel belum ada)
 
-    # Langkah B: Konfigurasi Load Job menggunakan WRITE_APPEND
+    # C. Proses Ingesti (APPEND)
+    # Gunakan WRITE_APPEND untuk menyambung data baru di bawah data historis
     job_config = bigquery.LoadJobConfig(
-        write_disposition="WRITE_APPEND",  # <--- SEKARANG PAKAI APPEND AGAR DATA BERTAHAP NYETAK
+        write_disposition="WRITE_APPEND", 
         source_format=bigquery.SourceFormat.PARQUET if hasattr(pd, 'to_parquet') else bigquery.SourceFormat.CSV,
         autodetect=True,
     )
 
-    print(f"Memuat {len(filtered_df)} baris data untuk tanggal {execution_date} ke {full_table_id}...")
+    print(f"Menyisipkan {len(filtered_df)} baris data baru ke BigQuery...")
     
     try:
         job = client.load_table_from_dataframe(filtered_df, full_table_id, job_config=job_config)
-        job.result()  # Menunggu job selesai
-        print(f"Berhasil! Data tanggal {execution_date} telah diunggah.")
+        job.result() 
+        print(f"Berhasil! Data tanggal {execution_date} telah ditambahkan.")
     except Exception as e:
         print(f"Gagal mengunggah data: {e}")
 
+# SCRIPT EXECUTION ENTRY POINT
 if __name__ == "__main__":
-    # Setup Argument Parser untuk Airflow
     parser = argparse.ArgumentParser()
-    parser.add_argument('--date', required=True, help='Tanggal eksekusi dengan format YYYY-MM-DD')
+    parser.add_argument('--date', required=True, help='Tanggal eksekusi dari Airflow')
     args = parser.parse_args()
 
     load_raw_data(args.date)
