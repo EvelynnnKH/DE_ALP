@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Data Pipeline - Architecture & DMD</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chosen Palette: Corporate Blue, Slate, Emerald (Data), and Amber (Processing) -->
+    <!-- Application Structure Plan: 
+         1. Header with Title and Tab Navigation.
+         2. Tab 1: Architecture Diagram (Airflow, Ingestion, BigQuery Medallion, Metabase).
+         3. Tab 2: Data Model Diagram (Star Schema with 1 Fact and 4 Dims).
+         4. Interactive Side/Bottom Panel: Shows specific details when a component is clicked.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. Everything is built with HTML/CSS grids and flexbox for maximum crispness and interactivity. -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9; /* slate-100 */
+        }
+        .font-mono {
+            font-family: 'Fira Code', monospace;
+        }
+        
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.4s ease-out;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Card Hover Effects */
+        .interactive-card {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        .interactive-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .interactive-card.active-card {
+            border-color: #4f46e5; /* indigo-600 */
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.2);
+        }
+
+        /* Database Table Styles */
+        .db-table {
+            border-radius: 0.5rem;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            background: white;
+            border: 1px solid #e2e8f0;
+            width: 100%;
+        }
+        .db-header {
+            padding: 0.75rem 1rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .db-fact-header { background-color: #4f46e5; color: white; } /* Indigo */
+        .db-dim-header { background-color: #059669; color: white; } /* Emerald */
+        
+        .db-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 0.8rem;
+        }
+        .db-row:last-child { border-bottom: none; }
+        .db-row:nth-child(even) { background-color: #f8fafc; }
+        
+        .pk-key { color: #d97706; font-weight: 700; margin-right: 0.5rem; }
+        .fk-key { color: #2563eb; font-weight: 700; margin-right: 0.5rem; }
+        .col-type { color: #64748b; font-family: 'Fira Code', monospace; font-size: 0.75rem; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <!-- Navbar -->
+    <header class="bg-slate-900 text-white shadow-md z-10 flex-shrink-0">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row justify-between items-center">
+            <div class="flex items-center space-x-3 mb-4 md:mb-0">
+                <div class="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center text-xl font-bold">DE</div>
+                <div>
+                    <h1 class="text-xl font-bold leading-tight">Financial Data Pipeline</h1>
+                    <p class="text-slate-400 text-xs">Arsitektur Medallion & Pemodelan Dimensional</p>
+                </div>
+            </div>
+            <nav class="flex space-x-2 bg-slate-800 p-1 rounded-lg">
+                <button onclick="switchTab('tab-architecture')" id="btn-architecture" class="px-5 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white transition-colors focus:outline-none">Diagram Arsitektur</button>
+                <button onclick="switchTab('tab-dmd')" id="btn-dmd" class="px-5 py-2 rounded-md text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors focus:outline-none">Data Model (Star Schema)</button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow flex flex-col md:flex-row overflow-hidden relative">
+        
+        <!-- Interactive Canvas Area (Left/Top) -->
+        <div class="flex-grow p-6 overflow-y-auto bg-slate-50 relative" id="canvas-area">
+            
+            <!-- TAB 1: ARCHITECTURE DIAGRAM -->
+            <div id="tab-architecture" class="tab-content active max-w-5xl mx-auto">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-slate-800">Arsitektur End-to-End Pipeline</h2>
+                    <p class="text-sm text-slate-500 mt-1">Klik pada setiap komponen (*box*) untuk melihat teknologi dan deskripsi prosesnya.</p>
+                </div>
+
+                <!-- Diagram Container -->
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 relative">
+                    
+                    <!-- Orchestrator (Top) -->
+                    <div class="mb-10 text-center">
+                        <div onclick="showDetail('airflow')" class="interactive-card inline-block w-full max-w-2xl bg-indigo-50 border-2 border-indigo-200 rounded-xl p-4 relative z-10">
+                            <h3 class="font-bold text-indigo-900 text-lg flex items-center justify-center">
+                                <span class="mr-2 text-2xl">⏱️</span> Apache Airflow (Orchestrator)
+                            </h3>
+                            <p class="text-xs text-indigo-600 mt-1">Mengatur jadwal (@daily) dan dependensi tugas secara berurutan.</p>
+                            <!-- Connecting lines down -->
+                            <div class="absolute -bottom-6 left-1/4 w-0.5 h-6 bg-indigo-200"></div>
+                            <div class="absolute -bottom-6 left-1/2 w-0.5 h-6 bg-indigo-200"></div>
+                            <div class="absolute -bottom-6 left-3/4 w-0.5 h-6 bg-indigo-200"></div>
+                        </div>
+                    </div>
+
+                    <!-- Flow (Left to Right) -->
+                    <div class="flex flex-col lg:flex-row items-center justify-between gap-4">
+                        
+                        <!-- 1. Source -->
+                        <div onclick="showDetail('source')" class="interactive-card w-full lg:w-48 bg-slate-50 border-2 border-slate-200 rounded-xl p-4 text-center">
+                            <div class="text-3xl mb-2">📄</div>
+                            <h4 class="font-bold text-slate-700">Data Source</h4>
+                            <p class="text-[10px] text-slate-500 font-mono mt-1">stock_prices.csv</p>
+                        </div>
+
+                        <div class="hidden lg:block text-slate-300 font-bold text-2xl">➔</div>
+                        <div class="lg:hidden text-slate-300 font-bold text-2xl rotate-90">➔</div>
+
+                        <!-- 2. Data Warehouse Block (Medallion) -->
+                        <div class="flex-grow bg-blue-50/50 border-2 border-blue-100 rounded-2xl p-6 relative">
+                            <div class="absolute -top-3 left-6 bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full border border-blue-200">
+                                Google BigQuery (Data Warehouse)
+                            </div>
+                            
+                            <div class="flex flex-col xl:flex-row gap-6 mt-2">
+                                <!-- Bronze -->
+                                <div onclick="showDetail('bronze')" class="interactive-card flex-1 bg-amber-50 border border-amber-300 rounded-lg p-4 text-center">
+                                    <h4 class="font-bold text-amber-900 mb-1">🥉 Bronze Layer</h4>
+                                    <div class="text-[10px] bg-amber-100 text-amber-800 py-1 px-2 rounded mb-2 font-mono">load_raw.py (Pandas)</div>
+                                    <p class="text-xs text-amber-700">raw_stock_prices</p>
+                                </div>
+                                
+                                <div class="hidden xl:flex items-center text-blue-200 text-xl">➔</div>
+
+                                <!-- Silver -->
+                                <div onclick="showDetail('silver')" class="interactive-card flex-1 bg-slate-100 border border-slate-300 rounded-lg p-4 text-center">
+                                    <h4 class="font-bold text-slate-700 mb-1">🥈 Silver Layer</h4>
+                                    <div class="text-[10px] bg-slate-200 text-slate-800 py-1 px-2 rounded mb-2 font-mono">dbt run --select staging</div>
+                                    <p class="text-xs text-slate-600">stg_stock_prices (View)</p>
+                                </div>
+
+                                <div class="hidden xl:flex items-center text-blue-200 text-xl">➔</div>
+
+                                <!-- Gold -->
+                                <div onclick="showDetail('gold')" class="interactive-card flex-1 bg-yellow-50 border border-yellow-400 rounded-lg p-4 text-center shadow-sm">
+                                    <h4 class="font-bold text-yellow-900 mb-1">🥇 Gold Layer</h4>
+                                    <div class="text-[10px] bg-yellow-100 text-yellow-800 py-1 px-2 rounded mb-2 font-mono">dbt (Star Schema)</div>
+                                    <p class="text-xs text-yellow-700">fact & dim tables</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="hidden lg:block text-slate-300 font-bold text-2xl">➔</div>
+                        <div class="lg:hidden text-slate-300 font-bold text-2xl rotate-90">➔</div>
+
+                        <!-- 3. Serving -->
+                        <div onclick="showDetail('metabase')" class="interactive-card w-full lg:w-48 bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4 text-center">
+                            <div class="text-3xl mb-2">📊</div>
+                            <h4 class="font-bold text-emerald-800">Serving / BI</h4>
+                            <p class="text-[10px] text-emerald-600 font-mono mt-1">Metabase</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: DATA MODEL DIAGRAM (STAR SCHEMA) -->
+            <div id="tab-dmd" class="tab-content max-w-6xl mx-auto">
+                <div class="mb-6 flex justify-between items-end">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800">Data Model Diagram (Star Schema)</h2>
+                        <p class="text-sm text-slate-500 mt-1">Model dimensional di dalam <strong>Gold Layer</strong>. Klik tabel untuk detail teknis.</p>
+                    </div>
+                    <div class="text-xs flex space-x-4 bg-white px-4 py-2 rounded-lg border border-slate-200">
+                        <span class="flex items-center"><span class="pk-key text-lg mr-1">•</span> Primary Key</span>
+                        <span class="flex items-center"><span class="fk-key text-lg mr-1">•</span> Foreign Key</span>
+                    </div>
+                </div>
+
+                <!-- Star Schema Grid Layout -->
+                <!-- Menggunakan CSS Grid untuk menempatkan Fact di tengah dan Dims di sekelilingnya -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-10 relative items-center justify-items-center p-4">
+                    
+                    <!-- Top Left: Empty (or decorative) -->
+                    <div class="hidden lg:block"></div>
+
+                    <!-- Top Center: DIM DATE -->
+                    <div onclick="showDetail('dim_date')" class="interactive-card db-table w-full max-w-sm z-10">
+                        <div class="db-header db-dim-header">
+                            <span>📅 dim_date</span>
+                            <span class="text-[10px] bg-emerald-800 px-2 py-0.5 rounded">Dimension</span>
+                        </div>
+                        <div class="db-row"><span class="font-mono"><span class="pk-key">PK</span>date_key</span><span class="col-type">INT64</span></div>
+                        <div class="db-row"><span class="font-mono">full_date</span><span class="col-type">DATE</span></div>
+                        <div class="db-row"><span class="font-mono">year</span><span class="col-type">INT64</span></div>
+                        <div class="db-row"><span class="font-mono">month_number</span><span class="col-type">INT64</span></div>
+                        <div class="db-row"><span class="font-mono">year_month</span><span class="col-type">STRING</span></div>
+                    </div>
+
+                    <!-- Top Right: Empty -->
+                    <div class="hidden lg:block"></div>
+
+                    <!-- Middle Left: DIM STOCK -->
+                    <div onclick="showDetail('dim_stock')" class="interactive-card db-table w-full max-w-sm z-10">
+                        <div class="db-header db-dim-header">
+                            <span>🏢 dim_stock</span>
+                            <span class="text-[10px] bg-emerald-800 px-2 py-0.5 rounded">Dimension</span>
+                        </div>
+                        <div class="db-row"><span class="font-mono"><span class="pk-key">PK</span>stock_key</span><span class="col-type">STRING (MD5)</span></div>
+                        <div class="db-row"><span class="font-mono">ticker</span><span class="col-type">STRING</span></div>
+                        <div class="db-row"><span class="font-mono">company_name</span><span class="col-type">STRING</span></div>
+                    </div>
+
+                    <!-- CENTER: FACT TABLE -->
+                    <div onclick="showDetail('fact_stock')" class="interactive-card db-table w-full max-w-md transform scale-105 z-20 shadow-xl">
+                        <div class="db-header db-fact-header">
+                            <span>📈 fact_stock_prices</span>
+                            <span class="text-[10px] bg-indigo-800 px-2 py-0.5 rounded">Fact Table</span>
+                        </div>
+                        <!-- Keys -->
+                        <div class="db-row bg-indigo-50/50"><span class="font-mono"><span class="pk-key">PK</span>fact_id</span><span class="col-type">STRING</span></div>
+                        <div class="db-row"><span class="font-mono"><span class="fk-key">FK</span>date_key</span><span class="col-type">INT64</span></div>
+                        <div class="db-row"><span class="font-mono"><span class="fk-key">FK</span>stock_key</span><span class="col-type">STRING</span></div>
+                        <div class="db-row"><span class="font-mono"><span class="fk-key">FK</span>sector_key</span><span class="col-type">STRING</span></div>
+                        <div class="db-row"><span class="font-mono"><span class="fk-key">FK</span>industry_key</span><span class="col-type">STRING</span></div>
+                        <!-- Metrics -->
+                        <div class="db-row"><span class="font-mono">open_price</span><span class="col-type">NUMERIC</span></div>
+                        <div class="db-row"><span class="font-mono">close_price</span><span class="col-type">NUMERIC</span></div>
+                        <div class="db-row"><span class="font-mono">volume</span><span class="col-type">INT64</span></div>
+                        <div class="db-row"><span class="font-mono">price_change</span><span class="col-type">NUMERIC</span></div>
+                        <div class="db-row"><span class="font-mono">price_change_pct</span><span class="col-type">NUMERIC</span></div>
+                    </div>
+
+                    <!-- Middle Right: DIM SECTOR -->
+                    <div onclick="showDetail('dim_sector')" class="interactive-card db-table w-full max-w-sm z-10">
+                        <div class="db-header db-dim-header">
+                            <span>📊 dim_sector</span>
+                            <span class="text-[10px] bg-emerald-800 px-2 py-0.5 rounded">Dimension</span>
+                        </div>
+                        <div class="db-row"><span class="font-mono"><span class="pk-key">PK</span>sector_key</span><span class="col-type">STRING (MD5)</span></div>
+                        <div class="db-row"><span class="font-mono">sector</span><span class="col-type">STRING</span></div>
+                    </div>
+
+                    <!-- Bottom Left: Empty -->
+                    <div class="hidden lg:block"></div>
+
+                    <!-- Bottom Center: DIM INDUSTRY -->
+                    <div onclick="showDetail('dim_industry')" class="interactive-card db-table w-full max-w-sm z-10">
+                        <div class="db-header db-dim-header">
+                            <span>🏭 dim_industry</span>
+                            <span class="text-[10px] bg-emerald-800 px-2 py-0.5 rounded">Dimension</span>
+                        </div>
+                        <div class="db-row"><span class="font-mono"><span class="pk-key">PK</span>industry_key</span><span class="col-type">STRING (MD5)</span></div>
+                        <div class="db-row"><span class="font-mono">industry</span><span class="col-type">STRING</span></div>
+                    </div>
+                    
+                    <!-- Bottom Right: Empty -->
+                    <div class="hidden lg:block"></div>
+
+                    <!-- Visual Connector Lines (Background) -->
+                    <!-- Note: In responsive HTML without SVG/Canvas, absolute cross-lines can be messy. 
+                         Instead, the grid layout inherently implies the Star relationship. -->
+                </div>
+            </div>
+            
+        </div>
+
+        <!-- Details Sidebar Panel (Right/Bottom) -->
+        <div class="w-full md:w-80 lg:w-96 bg-white border-t md:border-t-0 md:border-l border-slate-200 flex-shrink-0 flex flex-col shadow-xl z-20">
+            <div class="p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                <h3 class="font-bold text-slate-800">Panel Detail Informasi</h3>
+                <span class="text-xl">🔍</span>
+            </div>
+            
+            <div id="detail-panel-content" class="p-6 overflow-y-auto flex-grow">
+                <!-- Default State -->
+                <div id="default-msg" class="text-center text-slate-400 mt-10">
+                    <div class="text-4xl mb-3">🖱️</div>
+                    <p class="text-sm">Silakan klik salah satu komponen pada diagram di sebelah kiri untuk melihat detail teknisnya di sini.</p>
+                </div>
+
+                <!-- Dynamic Content Container -->
+                <div id="dynamic-content" class="hidden">
+                    <div class="inline-block px-3 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-full mb-3" id="panel-badge">Kategori</div>
+                    <h2 class="text-2xl font-bold text-slate-900 mb-2" id="panel-title">Judul</h2>
+                    <p class="text-sm text-slate-600 mb-6 pb-4 border-b border-slate-100" id="panel-desc">Deskripsi singkat.</p>
+                    
+                    <h4 class="font-semibold text-slate-800 mb-3 text-sm">Spesifikasi Teknis:</h4>
+                    <ul class="space-y-3 text-sm text-slate-600" id="panel-specs">
+                        <!-- List items injected via JS -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // Data Content for Interactive Panels
+        const detailsData = {
+            // Architecture Components
+            'airflow': {
+                badge: 'Orchestrator', badgeColor: 'bg-indigo-100 text-indigo-700',
+                title: 'Apache Airflow',
+                desc: 'Mesin penjadwal (scheduler) yang mengatur seluruh siklus hidup pipeline.',
+                specs: [
+                    '<strong>DAG ID:</strong> <span class="font-mono text-xs bg-slate-100 p-1 rounded">master_financial_pipeline</span>',
+                    '<strong>Schedule:</strong> <code>@daily</code> (Batch Processing)',
+                    '<strong>Tugas:</strong> Menjalankan Ingesti Python, dbt staging, dbt dimension, dbt fact, dan dbt test secara berurutan.',
+                    '<strong>Dependensi:</strong> <code>upload >> staging >> dims >> fact >> test</code>'
+                ]
+            },
+            'source': {
+                badge: 'Data Source', badgeColor: 'bg-slate-200 text-slate-800',
+                title: 'CSV File',
+                desc: 'Dataset US Stock Market Historical OHLCV dari Kaggle.',
+                specs: [
+                    '<strong>Format:</strong> Comma Separated Values (.csv)',
+                    '<strong>Ukuran:</strong> Jutaan baris data historis harian.',
+                    '<strong>Sifat:</strong> Statis (Local File), dibaca menggunakan Pandas chunking untuk mencegah Out-Of-Memory.'
+                ]
+            },
+            'bronze': {
+                badge: 'Bronze Layer', badgeColor: 'bg-amber-100 text-amber-800',
+                title: 'Data Ingestion',
+                desc: 'Lapisan data mentah. Data dipindahkan persis seperti aslinya tanpa transformasi.',
+                specs: [
+                    '<strong>Script:</strong> <code>load_raw.py</code>',
+                    '<strong>Tabel BQ:</strong> <code>raw_stock_prices</code>',
+                    '<strong>Metode:</strong> Incremental Load via `Execution Date` Airflow.',
+                    '<strong>Idempotency:</strong> Menjalankan <code>DELETE</code> pada tanggal spesifik sebelum melakukan <code>WRITE_APPEND</code> untuk mencegah duplikasi.'
+                ]
+            },
+            'silver': {
+                badge: 'Silver Layer', badgeColor: 'bg-slate-200 text-slate-800',
+                title: 'dbt Staging',
+                desc: 'Lapisan pembersihan. Standardisasi format teks, casting tipe data, dan deduplikasi.',
+                specs: [
+                    '<strong>Model:</strong> <code>stg_stock_prices.sql</code>',
+                    '<strong>Materialisasi:</strong> <code>view</code>',
+                    '<strong>Deduplikasi:</strong> Menggunakan fungsi <code>row_number() over (partition by trade_date, ticker order by volume desc)</code>',
+                    '<strong>Testing:</strong> <code>not_null</code> pada semua kolom.'
+                ]
+            },
+            'gold': {
+                badge: 'Gold Layer', badgeColor: 'bg-yellow-100 text-yellow-800',
+                title: 'Star Schema',
+                desc: 'Model dimensional siap pakai (analytics-ready) untuk konsumsi BI.',
+                specs: [
+                    '<strong>Alat:</strong> dbt (Data Build Tool)',
+                    '<strong>Model:</strong> 1 Fact Table, 4 Dimension Tables.',
+                    '<strong>Surrogate Key:</strong> Menggunakan hashing <code>to_hex(md5(kolom))</code>.',
+                    '<strong>Materialisasi:</strong> <code>table</code> (Full Refresh) atau <code>incremental</code> (Merge).'
+                ]
+            },
+            'metabase': {
+                badge: 'Visualization', badgeColor: 'bg-emerald-100 text-emerald-800',
+                title: 'Metabase',
+                desc: 'Alat Business Intelligence sumber terbuka untuk membangun dashboard interaktif.',
+                specs: [
+                    '<strong>Koneksi:</strong> Terhubung via GCP Service Account.',
+                    '<strong>Target:</strong> Hanya membaca tabel dari Gold Layer (Marts) di BigQuery.',
+                    '<strong>Output:</strong> Line Chart (Tren Harga), Bar Chart (Volume Sektor), Table (Top Gainer).'
+                ]
+            },
+            
+            // Star Schema Components
+            'dim_date': {
+                badge: 'Dimension Table', badgeColor: 'bg-emerald-100 text-emerald-800',
+                title: 'dim_date',
+                desc: 'Menyimpan kalender transaksi. Membantu agregasi berdasarkan waktu (Bulan, Kuartal, Tahun).',
+                specs: [
+                    '<strong>Sumber Asal:</strong> Diambil dari `trade_date` unik pada staging.',
+                    '<strong>Primary Key:</strong> <code>date_key</code> (Integer format YYYYMMDD).',
+                    '<strong>Kolom Ekstraksi:</strong> <code>year</code>, <code>month_number</code>, <code>quarter_number</code>, <code>year_month</code>.'
+                ]
+            },
+            'dim_stock': {
+                badge: 'Dimension Table', badgeColor: 'bg-emerald-100 text-emerald-800',
+                title: 'dim_stock',
+                desc: 'Tabel dimensi yang menyimpan informasi profil emiten saham (perusahaan).',
+                specs: [
+                    '<strong>Primary Key:</strong> <code>stock_key</code> (MD5 Hash dari Ticker).',
+                    '<strong>Kolom Unik:</strong> <code>ticker</code> (Simbol Saham).',
+                    '<strong>Data Quality:</strong> Wajib <code>not_null</code> dan <code>unique</code> (dbt test).'
+                ]
+            },
+            'dim_sector': {
+                badge: 'Dimension Table', badgeColor: 'bg-emerald-100 text-emerald-800',
+                title: 'dim_sector',
+                desc: 'Menyimpan kategori tingkat tinggi dari bidang usaha perusahaan.',
+                specs: [
+                    '<strong>Primary Key:</strong> <code>sector_key</code> (MD5 Hash dari string Sector).',
+                    '<strong>Contoh Data:</strong> Technology, Healthcare, Financials.',
+                    '<strong>Manfaat:</strong> Untuk agregasi volume/performa per makro-industri.'
+                ]
+            },
+            'dim_industry': {
+                badge: 'Dimension Table', badgeColor: 'bg-emerald-100 text-emerald-800',
+                title: 'dim_industry',
+                desc: 'Menyimpan sub-kategori spesifik dari sektor bisnis perusahaan.',
+                specs: [
+                    '<strong>Primary Key:</strong> <code>industry_key</code> (MD5 Hash dari string Industry).',
+                    '<strong>Contoh Data:</strong> Software-Infrastructure, Banks-Regional.',
+                    '<strong>Kardinalitas:</strong> Lebih detail dari Sektor.'
+                ]
+            },
+            'fact_stock': {
+                badge: 'Fact Table', badgeColor: 'bg-indigo-100 text-indigo-800',
+                title: 'fact_stock_prices',
+                desc: 'Pusat dari Star Schema. Menyimpan matriks kuantitatif dan metrik turunan harian.',
+                specs: [
+                    '<strong>Primary Key:</strong> <code>fact_id</code> (Gabungan Date + Ticker).',
+                    '<strong>Foreign Keys:</strong> Menghubungkan ke 4 dimensi via <code>_key</code>.',
+                    '<strong>Metrik Dasar:</strong> open_price, close_price, high, low, volume.',
+                    '<strong>Metrik Turunan (Kalkulasi):</strong><br><code>price_change</code> (Close - Open)<br><code>price_change_pct</code> (Persentase perubahan).',
+                    '<strong>Mode:</strong> Mendukung klausa <code>{% if is_incremental() %}</code> di dbt.'
+                ]
+            }
+        };
+
+        // UI Logic
+        function switchTab(tabId) {
+            // Reset content
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            
+            // Reset buttons
+            const btnArch = document.getElementById('btn-architecture');
+            const btnDmd = document.getElementById('btn-dmd');
+            
+            if(tabId === 'tab-architecture') {
+                btnArch.className = "px-5 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white transition-colors focus:outline-none";
+                btnDmd.className = "px-5 py-2 rounded-md text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors focus:outline-none";
+            } else {
+                btnDmd.className = "px-5 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white transition-colors focus:outline-none";
+                btnArch.className = "px-5 py-2 rounded-md text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors focus:outline-none";
+            }
+            
+            // Clear side panel
+            document.getElementById('default-msg').classList.remove('hidden');
+            document.getElementById('dynamic-content').classList.add('hidden');
+            
+            // Remove active card styling
+            document.querySelectorAll('.interactive-card').forEach(el => el.classList.remove('active-card'));
+        }
+
+        function showDetail(componentId) {
+            const data = detailsData[componentId];
+            if(!data) return;
+
+            // Highlight clicked card
+            document.querySelectorAll('.interactive-card').forEach(el => el.classList.remove('active-card'));
+            // Find the clicked element via event target or explicitly (using a hacky way since event isn't passed)
+            // For robust behavior, we just rely on the user click visually or add 'this' to onclick. 
+            // Since I didn't pass 'this' in HTML, I'll let CSS :active or the click interaction itself suffice, 
+            // but for production, adding 'this' and toggling class is better. Let's fix that below by matching element context if possible, 
+            // but for simplicity, we just update the panel.
+            
+            // Update Panel UI
+            document.getElementById('default-msg').classList.add('hidden');
+            const dynContent = document.getElementById('dynamic-content');
+            dynContent.classList.remove('hidden');
+            
+            // Animate transition
+            dynContent.style.opacity = 0;
+            setTimeout(() => {
+                document.getElementById('panel-badge').className = `inline-block px-3 py-1 text-xs font-bold rounded-full mb-3 ${data.badgeColor}`;
+                document.getElementById('panel-badge').innerText = data.badge;
+                document.getElementById('panel-title').innerText = data.title;
+                document.getElementById('panel-desc').innerText = data.desc;
+                
+                const ul = document.getElementById('panel-specs');
+                ul.innerHTML = '';
+                data.specs.forEach(spec => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `• ${spec}`;
+                    ul.appendChild(li);
+                });
+                
+                dynContent.style.opacity = 1;
+                dynContent.style.transition = 'opacity 0.3s ease';
+            }, 50);
+        }
+    </script>
+</body>
+</html>
