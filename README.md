@@ -40,11 +40,6 @@ Airflow -.->|Task 1: upload_stock_prices| Python
 Airflow -.->|Task 2: dbt_run_staging| DBT_Staging
 Airflow -.->|Task 3 & 4: dbt_run_dims & incremental| DBT_Marts
 
-classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px;
-classDef db fill:#e1f5fe,stroke:#0277bd,stroke-width:2px;
-classDef airflow fill:#fce4ec,stroke:#c2185b,stroke-width:2px;
-classDef dbt fill:#fff3e0,stroke:#e65100,stroke-width:2px;
-
 class BQ_Raw,DBT_Marts db;
 class Airflow airflow;
 class DBT_Staging dbt;
