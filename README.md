@@ -48,6 +48,7 @@ classDef dbt fill:#fff3e0,stroke:#e65100,stroke-width:2px;
 class BQ_Raw,DBT_Marts db;
 class Airflow airflow;
 class DBT_Staging dbt;
+```
 
 Sistem ini mengadopsi arsitektur Medallion (Bronze, Silver, Gold).
 
