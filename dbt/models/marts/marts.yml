@@ -1,72 +1,164 @@
 version: 2
 
 models:
-
   - name: dim_stock
+    description: Stock dimension containing company information for each ticker symbol.
+
     columns:
       - name: stock_key
+        description: Surrogate key generated from the stock ticker.
         tests:
-          - not_null
           - unique
+          - not_null
 
       - name: ticker
+        description: Unique stock ticker symbol.
         tests:
-          - not_null
           - unique
+          - not_null
+
+      - name: company_name
+        description: Official company name associated with the ticker.
 
   - name: dim_sector
+    description: Sector dimension containing business sector classifications.
+
     columns:
       - name: sector_key
+        description: Surrogate key generated from the sector name.
         tests:
-          - not_null
           - unique
+          - not_null
+
+      - name: sector
+        description: Business sector classification of a company.
+        tests:
+          - unique
+          - not_null
 
   - name: dim_industry
+    description: Industry dimension containing detailed industry classifications.
+
     columns:
       - name: industry_key
+        description: Surrogate key generated from the industry name.
         tests:
-          - not_null
           - unique
+          - not_null
+
+      - name: industry
+        description: Detailed industry classification of a company.
+        tests:
+          - unique
+          - not_null
 
   - name: dim_date
+    description: Date dimension used for time-based analysis.
+
     columns:
       - name: date_key
+        description: Integer date key in YYYYMMDD format.
         tests:
-          - not_null
           - unique
+          - not_null
 
       - name: full_date
+        description: Calendar date.
         tests:
-          - not_null
           - unique
+          - not_null
+
+      - name: year
+        description: Year component of the date.
+
+      - name: month_number
+        description: Month component of the date.
+
+      - name: day_number
+        description: Day component of the date.
+
+      - name: quarter_number
+        description: Quarter component of the date.
+
+      - name: year_month
+        description: Year and month in YYYY-MM format.
 
   - name: fact_stock_prices
+    description: Fact table containing daily stock trading metrics and performance measures.
+
     columns:
       - name: fact_id
+        description: Unique identifier for each stock-date combination.
         tests:
-          - not_null
           - unique
-
-      - name: stock_key
-        tests:
-          - not_null
-
-      - name: sector_key
-        tests:
-          - not_null
-
-      - name: industry_key
-        tests:
           - not_null
 
       - name: date_key
+        description: Foreign key referencing dim_date.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_key
+
+      - name: stock_key
+        description: Foreign key referencing dim_stock.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_stock')
+                field: stock_key
+
+      - name: sector_key
+        description: Foreign key referencing dim_sector.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_sector')
+                field: sector_key
+
+      - name: industry_key
+        description: Foreign key referencing dim_industry.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_industry')
+                field: industry_key
+
+      - name: open_price
+        description: Opening stock price for the trading day.
+        tests:
+          - not_null
+
+      - name: high_price
+        description: Highest stock price during the trading day.
+        tests:
+          - not_null
+
+      - name: low_price
+        description: Lowest stock price during the trading day.
         tests:
           - not_null
 
       - name: close_price
+        description: Closing stock price for the trading day.
         tests:
           - not_null
 
+      - name: adj_close_price
+        description: Adjusted closing price accounting for stock splits and dividends.
+
       - name: volume
+        description: Total trading volume for the stock.
         tests:
           - not_null
+
+      - name: price_change
+        description: Difference between closing and opening price.
+
+      - name: price_change_pct
+        description: Percentage change between opening and closing price.

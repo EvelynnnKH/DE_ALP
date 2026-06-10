@@ -2,29 +2,60 @@ version: 2
 
 models:
   - name: stg_stock_prices
+    description: Cleaned and deduplicated stock price data sourced from the raw layer.
 
     columns:
-
       - name: trade_date
+        description: Trading date of the stock record.
         tests:
           - not_null
 
       - name: ticker
+        description: Unique stock ticker symbol.
         tests:
           - not_null
 
       - name: company_name
+        description: Company name associated with the ticker.
         tests:
           - not_null
 
       - name: sector
+        description: Business sector classification.
         tests:
           - not_null
 
       - name: industry
+        description: Industry classification.
+        tests:
+          - not_null
+
+      - name: open_price
+        description: Opening stock price.
+        tests:
+          - not_null
+
+      - name: high_price
+        description: Highest stock price during the trading day.
+        tests:
+          - not_null
+
+      - name: low_price
+        description: Lowest stock price during the trading day.
+        tests:
+          - not_null
+
+      - name: close_price
+        description: Closing stock price.
+        tests:
+          - not_null
+
+      - name: adj_close_price
+        description: Adjusted closing stock price.
         tests:
           - not_null
 
       - name: volume
+        description: Number of shares traded.
         tests:
           - not_null

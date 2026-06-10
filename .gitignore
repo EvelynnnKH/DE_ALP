@@ -24,3 +24,6 @@ dbt/.user.yml
 
 # IDEs
 .vscode/
+
+# Large local files
+metabase.tar
