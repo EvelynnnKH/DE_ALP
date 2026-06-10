@@ -625,13 +625,6 @@ Insights from Chart
 
 Simpan keempat chart tersebut ke dalam satu Dashboard utama.
 
-<img width="1095" height="993" alt="image" src="https://github.com/user-attachments/assets/069ac33a-93e3-491c-92dd-55da7994bde2" />
-
-### Insights dari Dashboard
-- Tren rata-rata harga penutupan dari 2020–2026. Harga tumbuh konsisten dari ~$100 ke ~$250.
-- Perbandingan rata-rata harga saham antar sektor. Healthcare ($247.28) memimpin, diikuti Financial Services ($197.98) dan Industrials ($194.14).
-- AAPL, CARR, dan NVDA secara konsisten mencatatkan return harian rata-rata tertinggi (~0.08–0.10%).
-- Volume perdagangan memuncak di Q1 2021 (~160 miliar) lalu menurun bertahap hingga 2026.
 ---
 
 # **5. Expected Output**
@@ -665,6 +658,13 @@ fact_stock_prices
 
 Dashboard berhasil melakukan kalkulasi analitik dan menampilkan visualisasi grafik interaktif.
 
+<img width="1095" height="993" alt="image" src="https://github.com/user-attachments/assets/069ac33a-93e3-491c-92dd-55da7994bde2" />
+
+### Insights dari Dashboard
+- Tren rata-rata harga penutupan dari 2020–2026. Harga tumbuh konsisten dari ~$100 ke ~$250.
+- Perbandingan rata-rata harga saham antar sektor. Healthcare ($247.28) memimpin, diikuti Financial Services ($197.98) dan Industrials ($194.14).
+- AAPL, CARR, dan NVDA secara konsisten mencatatkan return harian rata-rata tertinggi (~0.08–0.10%).
+- Volume perdagangan memuncak di Q1 2021 (~160 miliar) lalu menurun bertahap hingga 2026.
 ---
 
 # **6. Findings & Conclusion**
