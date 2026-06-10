@@ -134,7 +134,7 @@ dbt Test
 
 ### Proses
 
-Terhubung langsung ke BigQuery (Marts Layer) untuk menyajikan dashboard analitik tanpa membebani basis data transaksional. Alur ini juga dapat diakses melalui description.html yang sudah di sediakan di dalam folder.
+Terhubung langsung ke BigQuery (Marts Layer) untuk menyajikan dashboard analitik tanpa membebani basis data transaksional.
 
 ---
 
