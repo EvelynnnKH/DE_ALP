@@ -134,7 +134,7 @@ dbt Test
 
 ### Proses
 
-Terhubung langsung ke BigQuery (Marts Layer) untuk menyajikan dashboard analitik tanpa membebani basis data transaksional.
+Terhubung langsung ke BigQuery (Marts Layer) untuk menyajikan dashboard analitik tanpa membebani basis data transaksional. Alur ini juga dapat diakses melalui description.html yang sudah di sediakan di dalam folder.
 
 ---
 
@@ -442,8 +442,20 @@ Success (Hijau)
 ```
 
 ---
+## **Tahap 6: Data Quality Testing (dbt)**
+### Menjalankan Test
 
-## **Tahap 6: Pembuatan Dokumentasi Data (dbt Docs)**
+```bash
+docker compose exec airflow-scheduler bash
+cd dbt
+dbt compile
+dbt run
+dbt test
+```
+
+Hasil: `PASS=42 WARN=0 ERROR=0 SKIP=0 TOTAL=42`
+
+## **Tahap 7: Pembuatan Dokumentasi Data (dbt Docs)**
 
 ### 1. Buka Terminal Baru
 
@@ -454,25 +466,21 @@ Buka terminal baru pada direktori proyek Anda.
 Masuk ke dalam kontainer Airflow dan jalankan:
 
 ```bash
+# Generate dokumentasi dari dalam container
 docker compose exec airflow-scheduler bash -c "cd /opt/airflow/dbt && dbt docs generate"
+
+# Jalankan web server lokal
+cd dbt/target
+py -m http.server 8000
 ```
 
-### 3. Akses Hasil Dokumentasi
+Buka di browser: `http://localhost:8000`
 
-Dokumen katalog akan dibuat di dalam folder:
-
-```text
-dbt/target/
-```
-
-Anda dapat membukanya secara lokal dengan:
-
-- Menjalankan Python web server
-- Membuka file `index.html` secara langsung
+Dokumentasi mencakup lineage graph, deskripsi tiap model dan kolom, serta status test per kolom.
 
 ---
 
-## **Tahap 7: Konfigurasi Metabase (Visualisasi)**
+## **Tahap 8: Konfigurasi Metabase (Visualisasi)**
 
 ### 1. Akses Metabase
 
@@ -524,44 +532,106 @@ Metabase akan memindai Data Warehouse Anda secara otomatis.
 
 ## **Panduan Pembuatan Chart**
 
-### **Tren Harga Saham**
+### Chart 1 — Stock Price Trend Over Time
 
-Buat Question baru dengan konfigurasi berikut:
+_How have stock prices changed over time, and what overall market trend can be observed?_
 
-```text
-Table          : fact_stock_prices
-Summarize      : Average of Close Price
-Group By       : Trade Date
-Visualization  : Line Chart
+```sql
+SELECT
+    d.full_date,
+    AVG(f.close_price) AS avg_close_price
+FROM raw.fact_stock_prices f
+JOIN raw.dim_date d ON f.date_key = d.date_key
+GROUP BY d.full_date
+ORDER BY d.full_date;
 ```
 
-### **Volume Perdagangan per Sektor**
+Visualization: **Line Chart**
 
-Buat Question baru dengan konfigurasi berikut:
+Insights from Chart
+- Are stock prices generally increasing or decreasing?
+- Are there periods of significant market downturns or recoveries?
+- What is the overall market direction over time?
+---
 
-```text
-Table          : fact_stock_prices
-Summarize      : Sum of Volume
-Group By       : Sector
-Visualization  : Bar Chart
+### Chart 2 — Sector Performance Comparison
+
+_Which business sectors have the highest average stock prices?_
+
+```sql
+SELECT
+    ds.sector,
+    ROUND(AVG(f.close_price), 2) AS avg_close_price
+FROM raw.fact_stock_prices f
+JOIN raw.dim_sector ds ON f.sector_key = ds.sector_key
+GROUP BY ds.sector
+ORDER BY avg_close_price DESC;
 ```
 
-### **Top Kenaikan Harga**
+Visualization: **Bar Chart**
 
-Buat Question baru dengan konfigurasi berikut:
+Insights from Chart
+- Which sectors perform better than others?
+- Which sectors may offer stronger investment opportunities?
+- How do average stock prices vary across sectors?
+---
 
-```text
-Table          : fact_stock_prices
-Field          : price_change_pct
-Sort           : Descending
-Limit          : 10
-Visualization  : Table
+### Chart 3 — Top 10 Stocks by Average Daily Return (%)
+
+_Which stocks generate the highest average daily returns?_
+
+```sql
+SELECT
+    ds.ticker,
+    ROUND(AVG(f.price_change_pct), 2) AS avg_return_pct
+FROM raw.fact_stock_prices f
+JOIN raw.dim_stock ds ON f.stock_key = ds.stock_key
+GROUP BY ds.ticker
+ORDER BY avg_return_pct DESC
+LIMIT 10;
 ```
+
+Visualization: **Bar Chart**
+
+Insights from Chart
+- Which stocks provide the strongest average returns?
+- Which stocks outperform the broader market?
+- Which stocks may attract growth-oriented investors?
+---
+
+### Chart 4 — Quarterly Trading Volume Trend
+
+_How has trading activity changed over time, and during which periods was trading volume highest?_
+
+```sql
+SELECT
+    DATE_TRUNC(d.full_date, QUARTER) AS quarter_date,
+    SUM(f.volume) AS total_volume
+FROM raw.fact_stock_prices f
+JOIN raw.dim_date d ON f.date_key = d.date_key
+GROUP BY quarter_date
+ORDER BY quarter_date;
+```
+
+Visualization: **Line Chart**
+
+Insights from Chart
+- When was trading activity at its peak?
+- Is market participation increasing or decreasing?
+- Are there unusual spikes in trading volume?
+---
 
 ### **Dashboard Utama**
 
-Simpan ketiga chart tersebut ke dalam satu Dashboard utama.
+Simpan keempat chart tersebut ke dalam satu Dashboard utama.
 
+<img width="1095" height="993" alt="image" src="https://github.com/user-attachments/assets/069ac33a-93e3-491c-92dd-55da7994bde2" />
+
+### Insights dari Dashboard
+- Tren rata-rata harga penutupan dari 2020–2026. Harga tumbuh konsisten dari ~$100 ke ~$250.
+- Perbandingan rata-rata harga saham antar sektor. Healthcare ($247.28) memimpin, diikuti Financial Services ($197.98) dan Industrials ($194.14).
+- AAPL, CARR, dan NVDA secara konsisten mencatatkan return harian rata-rata tertinggi (~0.08–0.10%).
+- Volume perdagangan memuncak di Q1 2021 (~160 miliar) lalu menurun bertahap hingga 2026.
 ---
 
 # **5. Expected Output**
